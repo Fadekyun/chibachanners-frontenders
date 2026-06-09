@@ -17,10 +17,12 @@ services:
     restart: unless-stopped
 
   chibachan:
-    image: ghcr.io/fadekyun/chibachanners-frontenders:latest
+    build:
+      context: https://github.com/Fadekyun/chibachanners-frontenders.git
+      dockerfile: Dockerfile
     container_name: chibachan
     ports:
-      - "3000:3000"
+      - "8090:8090"
     volumes:
       - ./checkins:/app/data
     environment:
