@@ -80,15 +80,15 @@ The browser never calls the bot API directly and never receives the API key.
 
 ## Personal frontend URL contract
 
-The bot remains responsible for adding the attendee-facing frontend URL to its Discord message or DM. The frontend does not create or send that link.
+The bot is responsible for generating and sending the attendee-facing frontend URL in its Discord message or DM. The frontend does not create or send that link.
 
-The current frontend expects the bot-provided URL to include a signed token query parameter:
+The bot already provides a signed personal URL in this format:
 
 ```text
 https://<frontend-domain>/?token=<signed-token>
 ```
 
-The token payload must include:
+The token payload includes:
 
 ```json
 {
@@ -99,7 +99,7 @@ The token payload must include:
 
 The bot and frontend must use the same `OFFKAI_JWT_SECRET`. An expiry claim is recommended so old personal RSVP links stop working after the event.
 
-If the bot already generates this complete signed URL, no additional link-generation work is required. If it currently adds only the bare frontend URL without `?token=...`, update the bot-side URL formatting before deployment.
+No additional bot-side link-generation work is required for the frontend integration.
 
 ## Required offkai-bot API contract
 
