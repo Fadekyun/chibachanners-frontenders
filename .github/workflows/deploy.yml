@@ -18,33 +18,9 @@ jobs:
     name: Build and deploy frontend
     runs-on: [self-hosted, linux]
 
-    env:
-      OFFKAI_DATA_DIR: ${{ vars.OFFKAI_DATA_DIR }}
-
     steps:
       - name: Check out frontend repository
         uses: actions/checkout@v4
-
-      - name: Validate deployment configuration
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "${OFFKAI_DATA_DIR:-}" ]; then
-            echo "Missing repository variable: OFFKAI_DATA_DIR" >&2
-            exit 1
-          fi
-          if [ ! -d "$OFFKAI_DATA_DIR" ]; then
-            echo "OFFKAI_DATA_DIR does not exist on the deployment host: $OFFKAI_DATA_DIR" >&2
-            exit 1
-          fi
-          if [ ! -f "$OFFKAI_DATA_DIR/events.json" ]; then
-            echo "Missing required bot file: $OFFKAI_DATA_DIR/events.json" >&2
-            exit 1
-          fi
-          if [ ! -f "$OFFKAI_DATA_DIR/responses.json" ]; then
-            echo "Missing required bot file: $OFFKAI_DATA_DIR/responses.json" >&2
-            exit 1
-          fi
 
       - name: Build and recreate frontend container
         shell: bash
