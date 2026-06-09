@@ -25,11 +25,9 @@ The deployment host needs a GitHub Actions self-hosted runner registered for thi
 ```text
 self-hosted
 linux
-arm64
-pi-deploy
 ```
 
-These labels match the existing Raspberry Pi deployment runner convention used by `offkai-bot`.
+The runner should be installed on the actual host that will run the frontend container. It does not need to be a Raspberry Pi or use a specific CPU architecture.
 
 The runner user must be allowed to run:
 
