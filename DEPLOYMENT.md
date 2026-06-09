@@ -1,59 +1,96 @@
-# Docker deployment and offkai-bot API handoff
+# Docker deployment
 
-This repository is a Next.js standalone server. Build and run it as a Docker container exposed on host port `8090`.
+This repository is a Next.js standalone server. It reads the bot's JSON persistence files through a read-only Docker volume mount and exposes the frontend on host port `8090`.
 
-## Build and run the frontend
+No internal HTTP API is required.
 
-```bash
-docker build -t chibachanners-frontend:latest .
+## Required bot files
 
-docker run -d \
-  --name chibachanners-frontend \
-  --restart unless-stopped \
-  --network offkai-network \
-  -p 8090:8090 \
-  -e OFFKAI_JWT_SECRET \
-  -e OFFKAI_API_URL=http://offkai-bot:8080/api \
-  -e OFFKAI_API_KEY \
-  -e MOCK_MODE=false \
-  chibachanners-frontend:latest
+The frontend reads:
+
+```text
+events.json
+responses.json
 ```
 
-The deployment host should provide `OFFKAI_JWT_SECRET` and `OFFKAI_API_KEY` through its secret-management method. Do not commit either value.
+The bot remains the only writer. The frontend mounts the data directory read-only and never modifies these files.
 
-## Docker Compose example
+## First deployment
+
+Clone the repository on the deployment host:
+
+```bash
+git clone https://github.com/Fadekyun/chibachanners-frontenders.git
+cd chibachanners-frontenders
+```
+
+Create an environment file on the host:
+
+```bash
+cat > .env <<'EOF'
+OFFKAI_JWT_SECRET=replace-with-the-same-secret-used-by-the-bot
+OFFKAI_DATA_DIR=/absolute/path/to/offkai-bot/data
+EOF
+```
+
+Do not commit `.env`.
+
+Start the frontend:
+
+```bash
+docker compose up -d --build
+```
+
+The frontend will be available at:
+
+```text
+http://<deployment-host>:8090
+```
+
+## Docker Compose configuration
+
+The repository includes `docker-compose.yml`:
 
 ```yaml
 services:
-  offkai-bot:
-    container_name: offkai-bot
-    # Existing offkai-bot image or build configuration goes here.
-    expose:
-      - "8080"
-    networks:
-      - offkai-network
-
   chibachanners-frontend:
     build: .
     container_name: chibachanners-frontend
     restart: unless-stopped
-    depends_on:
-      - offkai-bot
     ports:
       - "8090:8090"
     environment:
       OFFKAI_JWT_SECRET: ${OFFKAI_JWT_SECRET}
-      OFFKAI_API_URL: http://offkai-bot:8080/api
-      OFFKAI_API_KEY: ${OFFKAI_API_KEY}
+      OFFKAI_EVENTS_FILE: /app/offkai-data/events.json
+      OFFKAI_RESPONSES_FILE: /app/offkai-data/responses.json
       MOCK_MODE: "false"
-    networks:
-      - offkai-network
-
-networks:
-  offkai-network:
+    volumes:
+      - ${OFFKAI_DATA_DIR}:/app/offkai-data:ro
 ```
 
-Only the frontend port `8090` needs to be host-facing. The bot API can remain private inside the Docker network.
+## Updating after a frontend code change
+
+Docker does not automatically rebuild merely because the GitHub repository changed.
+
+To deploy the latest frontend code manually:
+
+```bash
+cd chibachanners-frontenders
+git pull --ff-only
+docker compose up -d --build
+```
+
+This rebuilds the image only when required and recreates the running frontend container.
+
+## Optional automatic deployment
+
+To rebuild automatically after every push to `main`, the deployment host needs an automation layer. Common options are:
+
+1. a GitHub Actions self-hosted runner on the deployment host;
+2. a webhook that runs the update commands;
+3. a scheduled cron job that periodically pulls and rebuilds.
+
+For the initial deployment, manual updates are simpler and easier to debug.
 
 ## Health check
 
@@ -69,20 +106,17 @@ Expected response:
 
 ## Frontend request flow
 
-1. The bot sends the attendee a personal frontend URL in Discord DM.
+1. The bot sends the attendee a complete signed personal URL in Discord DM.
 2. The browser opens `/?token=<signed-token>`.
-3. The page requests `/api/attendee?token=<signed-token>` from the Next.js server.
-4. The Next.js route verifies the token with `OFFKAI_JWT_SECRET`.
-5. The Next.js server calls the internal offkai-bot API with `Authorization: Bearer <OFFKAI_API_KEY>`.
-6. The browser receives only the attendee and event records required to render the RSVP card.
+3. The Next.js server verifies the token with `OFFKAI_JWT_SECRET`.
+4. The Next.js server reads the mounted `events.json` and `responses.json` files.
+5. The server returns only the event and attendee fields required to render the RSVP card.
 
-The browser never calls the bot API directly and never receives the API key.
+The raw JSON files are never exposed publicly.
 
-## Personal frontend URL contract
+## Personal URL contract
 
-The bot is responsible for generating and sending the attendee-facing frontend URL in its Discord message or DM. The frontend does not create or send that link.
-
-The bot already provides a signed personal URL in this format:
+The bot already sends a URL in this format:
 
 ```text
 https://<frontend-domain>/?token=<signed-token>
@@ -97,66 +131,7 @@ The token payload includes:
 }
 ```
 
-The bot and frontend must use the same `OFFKAI_JWT_SECRET`. An expiry claim is recommended so old personal RSVP links stop working after the event.
-
-No additional bot-side link-generation work is required for the frontend integration.
-
-## Required offkai-bot API contract
-
-The bot needs to expose an HTTP listener on `0.0.0.0:8080` and accept a bearer token configured on the deployment host.
-
-### `GET /api/health`
-
-Returns HTTP `200` when the API process is running.
-
-```json
-{"status":"ok"}
-```
-
-### `GET /api/events/{event_name}`
-
-Returns HTTP `200` with the event record required by the frontend, or HTTP `404` when the event does not exist.
-
-Required response fields:
-
-```json
-{
-  "event_name": "Bandori 10th Offkai",
-  "venue": "Example venue",
-  "address": "Tokyo, Japan",
-  "google_maps_link": "https://example.invalid/maps",
-  "event_datetime": "2026-06-14T12:00:00+09:00",
-  "event_deadline": "2026-06-12T00:00:00+09:00",
-  "open": true,
-  "drinks": ["Oolong Tea (L)"],
-  "max_capacity": 30
-}
-```
-
-Do not return internal Discord fields such as `channel_id`, `thread_id`, `message_id`, `creator_id`, `ping_role_id`, or `role_id` unless a later frontend feature explicitly requires them.
-
-### `GET /api/events/{event_name}/attendees/{user_id}`
-
-Returns HTTP `200` with a matching attendee or waitlist entry, or HTTP `404` when the user has no RSVP for the event.
-
-Required response fields:
-
-```json
-{
-  "user_id": 123456789,
-  "event_name": "Bandori 10th Offkai",
-  "status": "attending",
-  "username": "example-user",
-  "display_name": "Example User",
-  "drinks": ["Oolong Tea (L)"],
-  "extra_people": 1,
-  "extras_names": ["Guest name"],
-  "behavior_confirmed": true,
-  "arrival_confirmed": true
-}
-```
-
-Use `"status": "waitlist"` for a waitlist entry.
+The bot and frontend must use the same `OFFKAI_JWT_SECRET`.
 
 ## Remaining packaging follow-up
 
