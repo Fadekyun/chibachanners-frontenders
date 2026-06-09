@@ -1,0 +1,34 @@
+services:
+  discord-offkai-bot:
+    build: .
+    container_name: discord-offkai-bot
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+
+  offkai-api:
+    build: ./api
+    container_name: offkai-api
+    volumes:
+      - ./data:/app/data:ro
+    environment:
+      - OFFKAI_API_KEY=${OFFKAI_API_KEY}
+    restart: unless-stopped
+
+  chibachan:
+    image: ghcr.io/fadekyun/chibachanners-frontenders:latest
+    container_name: chibachan
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./checkins:/app/data
+    environment:
+      - OFFKAI_API_URL=http://offkai-api:8090
+      - OFFKAI_API_KEY=${OFFKAI_API_KEY}
+      - OFFKAI_JWT_SECRET=${OFFKAI_JWT_SECRET}
+      - ADMIN_KEY=${ADMIN_KEY}
+      - NEXT_PUBLIC_EVENT_NAME=${EVENT_NAME}
+    depends_on:
+      - offkai-api
+    restart: unless-stopped
