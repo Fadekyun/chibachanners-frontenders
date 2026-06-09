@@ -19,7 +19,6 @@ jobs:
     runs-on: [self-hosted, linux, arm64, pi-deploy]
 
     env:
-      OFFKAI_JWT_SECRET: ${{ secrets.OFFKAI_JWT_SECRET }}
       OFFKAI_DATA_DIR: ${{ vars.OFFKAI_DATA_DIR }}
 
     steps:
@@ -30,10 +29,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${OFFKAI_JWT_SECRET:-}" ]; then
-            echo "Missing repository secret: OFFKAI_JWT_SECRET" >&2
-            exit 1
-          fi
           if [ -z "${OFFKAI_DATA_DIR:-}" ]; then
             echo "Missing repository variable: OFFKAI_DATA_DIR" >&2
             exit 1
