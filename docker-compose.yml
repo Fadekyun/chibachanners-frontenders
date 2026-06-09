@@ -6,7 +6,6 @@ services:
     ports:
       - "8090:8090"
     environment:
-      OFFKAI_JWT_SECRET: ${OFFKAI_JWT_SECRET}
       OFFKAI_EVENTS_FILE: /app/offkai-data/events.json
       OFFKAI_RESPONSES_FILE: /app/offkai-data/responses.json
       MOCK_MODE: "false"
