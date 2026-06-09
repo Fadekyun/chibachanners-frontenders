@@ -1,7 +1,6 @@
 'use client'
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-// @ts-expect-error - react-qr-code types resolution issue with exports field
 import QRCode from 'react-qr-code'
 
 type ViewState = 'loading' | 'no_token' | 'invalid' | 'not_found' | 'ready'
@@ -184,7 +183,12 @@ function AttendeeView() {
   const [data, setData] = useState<AttendeeData | null>(null)
 
   useEffect(() => {
-    if (!token) { setView('no_token'); return }
+    if (!token) {
+      // Token is absent — schedule the state update asynchronously to avoid a
+      // synchronous setState call inside the effect body.
+      const id = setTimeout(() => setView('no_token'), 0)
+      return () => clearTimeout(id)
+    }
 
     fetch(`/api/attendee?token=${encodeURIComponent(token)}`)
       .then(async r => ({ ok: r.ok, status: r.status, body: await r.json() }))

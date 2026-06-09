@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const OFFKAI_API_URL = process.env.OFFKAI_API_URL ?? ''
-const OFFKAI_API_KEY = process.env.OFFKAI_API_KEY ?? ''
+// Placeholder — upstream attendee list is not yet connected.
+// MOCK_MODE=true returns a static list for local development and UI testing only.
+
 const MOCK_MODE = process.env.MOCK_MODE === 'true'
 const ADMIN_KEY = process.env.ADMIN_KEY ?? ''
 
@@ -24,24 +25,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ event_name: MOCK_EVENT_NAME, attendees: MOCK_ATTENDEES })
   }
 
-  try {
-    const headers = { Authorization: `Bearer ${OFFKAI_API_KEY}` }
-
-    // Fetch the active (open, not archived) event
-    const activeRes = await fetch(`${OFFKAI_API_URL}/events/active`, { headers, next: { revalidate: 30 } })
-    if (!activeRes.ok) throw new Error('no active event')
-    const activeEvent = await activeRes.json()
-    const event_name = activeEvent.event_name as string
-
-    // Fetch attendees for that event
-    const attendeesRes = await fetch(
-      `${OFFKAI_API_URL}/events/${encodeURIComponent(event_name)}/attendees`,
-      { headers, next: { revalidate: 30 } }
-    )
-    if (!attendeesRes.ok) throw new Error(`upstream ${attendeesRes.status}`)
-
-    return NextResponse.json({ event_name, attendees: await attendeesRes.json() })
-  } catch {
-    return NextResponse.json({ error: 'upstream_error' }, { status: 502 })
-  }
+  return NextResponse.json({ error: 'attendees_pending' }, { status: 501 })
 }

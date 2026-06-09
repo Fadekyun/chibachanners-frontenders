@@ -1,22 +1,18 @@
 # chibachanners-frontenders
 
-Next.js frontend for Chibaichan offkai RSVP pages.
+Next.js frontend for Chibachan offkai RSVP pages.
 
-## Current rollout status
+## What is included
 
-The frontend container is ready to deploy independently on port `8090`.
+- Multi-stage Docker build (Next.js standalone server, non-root user)
+- Docker Compose service on port `8090`
+- Health endpoint at `/api/health`
+- Attendee RSVP view with QR code display
+- Admin check-in panel (attendee lookup and QR scan, placeholder until bot integration)
+- Favicon and web app manifest
+- GitHub Actions workflow for automatic deployment on a self-hosted Linux runner
 
-Included:
-
-- multi-stage Docker build;
-- Docker Compose service;
-- health endpoint at `/api/health`;
-- automatic deployment workflow for Linux self-hosted GitHub Actions runners;
-- favicon and web app manifest.
-
-The attendee-specific lookup route is intentionally a placeholder until the bot's real personal-link and cross-container data-sharing contract are confirmed.
-
-## Quick local deployment
+## First manual build
 
 ```bash
 git clone https://github.com/Fadekyun/chibachanners-frontenders.git
@@ -24,28 +20,29 @@ cd chibachanners-frontenders
 docker compose up -d --build
 ```
 
-Verify:
+Verify health:
 
 ```bash
 curl --fail http://127.0.0.1:8090/api/health
+# {"status":"ok"}
 ```
 
-Expected response:
+## Automatic redeploy
 
-```json
-{"status":"ok"}
-```
+Register a self-hosted Linux runner for this repository, then push to `main`.
+The workflow at `.github/workflows/deploy.yml` rebuilds and recreates the container automatically.
 
-## Automatic deployment
+To trigger manually: **Actions → Deploy frontend → Run workflow**.
 
-The repository includes `.github/workflows/deploy.yml`.
+See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for setup details.
 
-Register a Linux self-hosted runner for this repository on the deployment host, then start the first build from:
+## Self-hosted runner requirement
 
-```text
-Actions → Deploy frontend → Run workflow
-```
+The workflow runs on `[self-hosted, linux]`. No cloud runners or repository secrets
+are required for initial rollout.
 
-Future pushes to `main` rebuild and recreate the frontend container automatically.
+## Offkai-bot integration (deferred)
 
-See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for the complete handoff.
+The attendee routes are intentional placeholders. They return `501` until the bot's
+data-sharing contract is confirmed. See [`offkai-bot-data/README.md`](./offkai-bot-data/README.md)
+for the planned integration options (shared host folder, Docker volume, or internal API).
