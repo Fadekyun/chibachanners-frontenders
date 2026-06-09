@@ -15,31 +15,86 @@ responses.json
 
 The bot remains the only writer. The frontend mounts the data directory read-only and never modifies these files.
 
+## Automatic deployment is included
+
+The repository includes `.github/workflows/deploy.yml`.
+
+Every push to `main` automatically:
+
+1. checks out the latest frontend code on the self-hosted deployment runner;
+2. checks that the required bot JSON files exist;
+3. runs `docker compose up -d --build --remove-orphans`;
+4. verifies `http://127.0.0.1:8090/api/health`;
+5. removes dangling Docker images after a successful deployment.
+
+The workflow can also be started manually from the GitHub Actions tab using **Run workflow**.
+
+## One-time deployment setup
+
+The deployment host needs a GitHub Actions self-hosted runner registered for this frontend repository. Use these runner labels:
+
+```text
+self-hosted
+linux
+arm64
+pi-deploy
+```
+
+These labels match the existing Raspberry Pi deployment runner convention used by `offkai-bot`.
+
+The runner user must be allowed to run:
+
+```bash
+docker compose version
+curl --version
+```
+
+The runner user must also be able to read the bot data directory.
+
+## GitHub repository settings
+
+Before the first deployment, configure these settings in:
+
+```text
+GitHub repository → Settings → Secrets and variables → Actions
+```
+
+Create one repository secret:
+
+```text
+OFFKAI_JWT_SECRET
+```
+
+Use the same JWT secret already used by the bot when it generates personal attendee URLs.
+
+Create one repository variable:
+
+```text
+OFFKAI_DATA_DIR
+```
+
+Set it to the absolute path of the bot data directory on the deployment host. That directory must contain:
+
+```text
+events.json
+responses.json
+```
+
+Example:
+
+```text
+/home/eyal/offkai-bot/data
+```
+
 ## First deployment
 
-Clone the repository on the deployment host:
+After the runner and repository settings are ready, open:
 
-```bash
-git clone https://github.com/Fadekyun/chibachanners-frontenders.git
-cd chibachanners-frontenders
+```text
+GitHub repository → Actions → Deploy frontend → Run workflow
 ```
 
-Create an environment file on the host:
-
-```bash
-cat > .env <<'EOF'
-OFFKAI_JWT_SECRET=replace-with-the-same-secret-used-by-the-bot
-OFFKAI_DATA_DIR=/absolute/path/to/offkai-bot/data
-EOF
-```
-
-Do not commit `.env`.
-
-Start the frontend:
-
-```bash
-docker compose up -d --build
-```
+The workflow builds and starts the container automatically.
 
 The frontend will be available at:
 
@@ -70,27 +125,27 @@ services:
 
 ## Updating after a frontend code change
 
-Docker does not automatically rebuild merely because the GitHub repository changed.
-
-To deploy the latest frontend code manually:
+Push the update to `main`:
 
 ```bash
-cd chibachanners-frontenders
-git pull --ff-only
-docker compose up -d --build
+git add .
+git commit -m "Describe the frontend change"
+git push origin main
 ```
 
-This rebuilds the image only when required and recreates the running frontend container.
+The GitHub Actions workflow rebuilds and recreates the frontend container automatically.
 
-## Optional automatic deployment
+A manual host-side fallback remains available:
 
-To rebuild automatically after every push to `main`, the deployment host needs an automation layer. Common options are:
+```bash
+git clone https://github.com/Fadekyun/chibachanners-frontenders.git
+cd chibachanners-frontenders
 
-1. a GitHub Actions self-hosted runner on the deployment host;
-2. a webhook that runs the update commands;
-3. a scheduled cron job that periodically pulls and rebuilds.
+export OFFKAI_JWT_SECRET='same-secret-used-by-the-bot'
+export OFFKAI_DATA_DIR='/absolute/path/to/offkai-bot/data'
 
-For the initial deployment, manual updates are simpler and easier to debug.
+docker compose up -d --build
+```
 
 ## Health check
 
