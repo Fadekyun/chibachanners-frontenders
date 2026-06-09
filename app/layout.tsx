@@ -4,14 +4,14 @@ import "./globals.css";
 
 const notoSans = Noto_Sans({
   subsets: ["latin"],
-  weight: ['400', '500', '700'],
-  variable: '--font-noto-sans'
+  weight: ["400", "500", "700"],
+  variable: "--font-noto-sans",
 });
 
 export const metadata: Metadata = {
   title: "chibachan",
   description: "offkai rsvp",
-  manifest: "/manifest.json",
+  manifest: "/manifest.webmanifest",
 };
 
 export const viewport: Viewport = {
