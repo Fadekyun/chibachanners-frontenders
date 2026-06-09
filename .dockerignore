@@ -5,8 +5,9 @@ node_modules
 npm-debug.log*
 .env
 .env.*
-!.env.example
 data
 checkins
 *.log
+offkai-bot-data
 README.md
+DEPLOYMENT.md

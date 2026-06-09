@@ -5,3 +5,4 @@ node_modules/
 data/
 checkins/
 *.log
+offkai-bot-data/*.json
