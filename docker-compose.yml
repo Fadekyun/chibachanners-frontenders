@@ -1,0 +1,14 @@
+services:
+  chibachanners-frontend:
+    build: .
+    container_name: chibachanners-frontend
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      OFFKAI_JWT_SECRET: ${OFFKAI_JWT_SECRET}
+      OFFKAI_EVENTS_FILE: /app/offkai-data/events.json
+      OFFKAI_RESPONSES_FILE: /app/offkai-data/responses.json
+      MOCK_MODE: "false"
+    volumes:
+      - ${OFFKAI_DATA_DIR}:/app/offkai-data:ro
