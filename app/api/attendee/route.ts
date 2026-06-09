@@ -1,10 +1,14 @@
+import { readFile } from 'node:fs/promises'
 import { NextRequest, NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 const OFFKAI_JWT_SECRET = process.env.OFFKAI_JWT_SECRET ?? ''
 const JWT_SECRET = new TextEncoder().encode(OFFKAI_JWT_SECRET)
-const OFFKAI_API_URL = process.env.OFFKAI_API_URL ?? ''
-const OFFKAI_API_KEY = process.env.OFFKAI_API_KEY ?? ''
+const OFFKAI_EVENTS_FILE = process.env.OFFKAI_EVENTS_FILE ?? '/app/offkai-data/events.json'
+const OFFKAI_RESPONSES_FILE = process.env.OFFKAI_RESPONSES_FILE ?? '/app/offkai-data/responses.json'
 const MOCK_MODE = process.env.MOCK_MODE === 'true'
 
 const MOCK_EVENT = {
@@ -28,6 +32,93 @@ const MOCK_ATTENDEE = {
   extras_names: ['Senpai'],
   behavior_confirmed: true,
   arrival_confirmed: false,
+}
+
+type JsonRecord = Record<string, unknown>
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function sleep(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
+async function readJsonWithRetry(path: string, attempts = 3): Promise<unknown> {
+  let lastError: unknown
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return JSON.parse(await readFile(path, 'utf8')) as unknown
+    } catch (error) {
+      lastError = error
+      if (attempt < attempts - 1) await sleep(50 * (attempt + 1))
+    }
+  }
+
+  throw lastError
+}
+
+function safeString(value: unknown, fallback = '') {
+  return typeof value === 'string' ? value : fallback
+}
+
+function safeBoolean(value: unknown) {
+  return value === true
+}
+
+function safeNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function safeStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function findEvent(events: unknown, eventName: string): JsonRecord | undefined {
+  if (!Array.isArray(events)) return undefined
+  return events.find((event) => isRecord(event) && safeString(event.event_name).toLowerCase() === eventName.toLowerCase())
+}
+
+function findEventResponses(responses: unknown, eventName: string): JsonRecord | undefined {
+  if (!isRecord(responses)) return undefined
+  const matchedKey = Object.keys(responses).find((key) => key.toLowerCase() === eventName.toLowerCase())
+  const eventResponses = matchedKey ? responses[matchedKey] : undefined
+  return isRecord(eventResponses) ? eventResponses : undefined
+}
+
+function findUser(entries: unknown, userId: number): JsonRecord | undefined {
+  if (!Array.isArray(entries)) return undefined
+  return entries.find((entry) => isRecord(entry) && String(entry.user_id) === String(userId))
+}
+
+function sanitizeEvent(event: JsonRecord) {
+  return {
+    event_name: safeString(event.event_name),
+    venue: safeString(event.venue, 'TBD'),
+    address: safeString(event.address),
+    google_maps_link: safeString(event.google_maps_link),
+    event_datetime: safeString(event.event_datetime),
+    event_deadline: typeof event.event_deadline === 'string' ? event.event_deadline : null,
+    open: safeBoolean(event.open),
+    drinks: safeStringArray(event.drinks),
+    max_capacity: safeNumber(event.max_capacity),
+  }
+}
+
+function sanitizeAttendee(attendee: JsonRecord, status: 'attending' | 'waitlist', eventName: string) {
+  return {
+    user_id: safeNumber(attendee.user_id),
+    event_name: safeString(attendee.event_name, eventName),
+    status,
+    username: safeString(attendee.username, 'Unknown User'),
+    display_name: typeof attendee.display_name === 'string' ? attendee.display_name : null,
+    drinks: safeStringArray(attendee.drinks),
+    extra_people: safeNumber(attendee.extra_people) ?? 0,
+    extras_names: safeStringArray(attendee.extras_names),
+    behavior_confirmed: safeBoolean(attendee.behavior_confirmed),
+    arrival_confirmed: safeBoolean(attendee.arrival_confirmed),
+  }
 }
 
 function configurationError() {
@@ -57,30 +148,28 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  if (!OFFKAI_API_URL || !OFFKAI_API_KEY) return configurationError()
-
   try {
-    const headers = { Authorization: `Bearer ${OFFKAI_API_KEY}` }
-    const [attendeeRes, eventRes] = await Promise.all([
-      fetch(`${OFFKAI_API_URL}/events/${encodeURIComponent(String(event_name))}/attendees/${user_id}`, {
-        headers,
-        cache: 'no-store',
-      }),
-      fetch(`${OFFKAI_API_URL}/events/${encodeURIComponent(String(event_name))}`, {
-        headers,
-        cache: 'no-store',
-      }),
+    const [events, responses] = await Promise.all([
+      readJsonWithRetry(OFFKAI_EVENTS_FILE),
+      readJsonWithRetry(OFFKAI_RESPONSES_FILE),
     ])
 
-    if (attendeeRes.status === 404 || eventRes.status === 404) {
-      return NextResponse.json({ error: 'not_found' }, { status: 404 })
-    }
-    if (!attendeeRes.ok) throw new Error(`attendee upstream ${attendeeRes.status}`)
-    if (!eventRes.ok) throw new Error(`event upstream ${eventRes.status}`)
+    const event = findEvent(events, event_name)
+    if (!event) return NextResponse.json({ error: 'not_found' }, { status: 404 })
 
-    const [attendee, event] = await Promise.all([attendeeRes.json(), eventRes.json()])
-    return NextResponse.json({ attendee, event })
+    const eventResponses = findEventResponses(responses, event_name)
+    const attendee = findUser(eventResponses?.attendees, user_id)
+    if (attendee) {
+      return NextResponse.json({ attendee: sanitizeAttendee(attendee, 'attending', event_name), event: sanitizeEvent(event) })
+    }
+
+    const waitlistEntry = findUser(eventResponses?.waitlist, user_id)
+    if (waitlistEntry) {
+      return NextResponse.json({ attendee: sanitizeAttendee(waitlistEntry, 'waitlist', event_name), event: sanitizeEvent(event) })
+    }
+
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
   } catch {
-    return NextResponse.json({ error: 'upstream_error' }, { status: 502 })
+    return NextResponse.json({ error: 'data_unavailable' }, { status: 503 })
   }
 }
