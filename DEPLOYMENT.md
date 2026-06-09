@@ -1,8 +1,8 @@
 # Docker deployment
 
-This repository is a Next.js standalone server. It exposes the frontend on host port `8090` and mounts the bot JSON persistence directory read-only for later attendee integration.
+This repository is a Next.js standalone server. It exposes the frontend on host port `8090`.
 
-The initial deployment goal is to keep the frontend container running and automatically rebuild it whenever `main` changes. The attendee token contract will be connected to the bot separately after its real format is confirmed.
+The initial deployment goal is to keep the frontend container running and automatically rebuild it whenever `main` changes. The attendee-data integration will be added separately after the bot container's real token and data-sharing contract are confirmed.
 
 ## Automatic deployment is included
 
@@ -11,10 +11,9 @@ The repository includes `.github/workflows/deploy.yml`.
 Every push to `main` automatically:
 
 1. checks out the latest frontend code on the self-hosted deployment runner;
-2. checks that the bot JSON directory and required files exist;
-3. runs `docker compose up -d --build --remove-orphans`;
-4. verifies `http://127.0.0.1:8090/api/health`;
-5. removes dangling Docker images after a successful deployment.
+2. runs `docker compose up -d --build --remove-orphans`;
+3. verifies `http://127.0.0.1:8090/api/health`;
+4. removes dangling Docker images after a successful deployment.
 
 The workflow can also be started manually from the GitHub Actions tab using **Run workflow**.
 
@@ -36,42 +35,9 @@ docker compose version
 curl --version
 ```
 
-The runner user must also be able to read the bot data directory.
-
-## GitHub repository setting
-
-Before the first deployment, configure this repository variable in:
-
-```text
-GitHub repository → Settings → Secrets and variables → Actions → Variables
-```
-
-Create:
-
-```text
-OFFKAI_DATA_DIR
-```
-
-Set it to the absolute host path of the bot repository's existing `./data` directory.
-
-Example:
-
-```text
-/home/eyal/offkai-bot/data
-```
-
-That directory must contain:
-
-```text
-events.json
-responses.json
-```
-
-No frontend secret is required for the initial deployment.
-
 ## First deployment
 
-After the runner and repository variable are ready, open:
+After the runner is ready, open:
 
 ```text
 GitHub repository → Actions → Deploy frontend → Run workflow
@@ -97,15 +63,7 @@ services:
     restart: unless-stopped
     ports:
       - "8090:8090"
-    environment:
-      OFFKAI_EVENTS_FILE: /app/offkai-data/events.json
-      OFFKAI_RESPONSES_FILE: /app/offkai-data/responses.json
-      MOCK_MODE: "false"
-    volumes:
-      - ${OFFKAI_DATA_DIR}:/app/offkai-data:ro
 ```
-
-The bot remains the only writer. The frontend mount is read-only.
 
 ## Updating after a frontend code change
 
@@ -125,8 +83,6 @@ A manual host-side fallback remains available:
 git clone https://github.com/Fadekyun/chibachanners-frontenders.git
 cd chibachanners-frontenders
 
-export OFFKAI_DATA_DIR='/absolute/path/to/offkai-bot/data'
-
 docker compose up -d --build
 ```
 
@@ -142,11 +98,24 @@ Expected response:
 {"status":"ok"}
 ```
 
+## Later bot integration
+
+The bot currently stores its live JSON under its own deployment volume. If the frontend later reads those files directly, the deployment host must mount the same underlying host folder or Docker volume into both containers:
+
+```text
+bot container       → /app/data          (read-write)
+frontend container  → /app/offkai-data   (read-only)
+```
+
+If the bot data is not available as a shared host folder or shared Docker volume, use an internal API instead.
+
+This data-sharing step is intentionally not part of the initial rollout.
+
 ## Current attendee-route status
 
 The container and health endpoint are ready for deployment.
 
-The attendee route intentionally returns a placeholder response until the bot's real personal-link contract is confirmed. This avoids inventing a JWT secret or token format that the bot does not currently use.
+The attendee route intentionally returns a placeholder response until the bot's real personal-link and data-sharing contract are confirmed.
 
 ## Remaining packaging follow-up
 
