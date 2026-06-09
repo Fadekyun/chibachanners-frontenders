@@ -30,7 +30,6 @@ services:
       - OFFKAI_API_KEY=${OFFKAI_API_KEY}
       - OFFKAI_JWT_SECRET=${OFFKAI_JWT_SECRET}
       - ADMIN_KEY=${ADMIN_KEY}
-      - NEXT_PUBLIC_EVENT_NAME=${EVENT_NAME}
     depends_on:
       - offkai-api
     restart: unless-stopped

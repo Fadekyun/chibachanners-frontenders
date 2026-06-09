@@ -69,18 +69,14 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ checked_in: true, record })
 }
 
-// GET /api/checkin?event=<name>&key=<admin_key>
+// GET /api/checkin?key=<admin_key> — returns flat list of all checkin records
 export async function GET(request: NextRequest) {
   const key = request.nextUrl.searchParams.get('key')
   if (!ADMIN_KEY || key !== ADMIN_KEY) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
-  const event = request.nextUrl.searchParams.get('event')
   const store = await readStore()
-
-  if (event) {
-    return NextResponse.json(Object.values(store[event] ?? {}))
-  }
-  return NextResponse.json(store)
+  const all = Object.values(store).flatMap(eventRecords => Object.values(eventRecords))
+  return NextResponse.json(all)
 }

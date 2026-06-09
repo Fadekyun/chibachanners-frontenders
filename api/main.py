@@ -37,6 +37,15 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/events/active", dependencies=[Depends(verify_api_key)])
+def get_active_event() -> dict[str, Any]:
+    events = load_events()
+    open_events = [e for e in events if e.get("open") and not e.get("archived")]
+    if not open_events:
+        raise HTTPException(status_code=404, detail="No active event")
+    return open_events[0]
+
+
 @app.get("/events/{event_name}", dependencies=[Depends(verify_api_key)])
 def get_event(event_name: str) -> dict[str, Any]:
     for e in load_events():

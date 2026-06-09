@@ -18,8 +18,6 @@ type CheckinRecord = {
   name: string
 }
 
-const EVENT_NAME = process.env.NEXT_PUBLIC_EVENT_NAME || 'Bandori 10th Offkai'
-
 function drinkDot(name: string) {
   const n = name.toLowerCase()
   if (n.includes('oolong'))      return 'bg-[#8B5E34]'
@@ -35,6 +33,7 @@ export default function AdminPage() {
   const [key, setKey] = useState('')
   const [authed, setAuthed] = useState(false)
   const [keyInput, setKeyInput] = useState('')
+  const [eventName, setEventName] = useState('')
   const [attendees, setAttendees] = useState<Attendee[]>([])
   const [checkins, setCheckins] = useState<Record<number, CheckinRecord>>({})
   const [scanning, setScanning] = useState(false)
@@ -46,14 +45,15 @@ export default function AdminPage() {
 
   const fetchData = useCallback(async (adminKey: string) => {
     const [attendeesRes, checkinsRes] = await Promise.all([
-      fetch(`/api/attendees?event=${encodeURIComponent(EVENT_NAME)}&key=${adminKey}`),
-      fetch(`/api/checkin?event=${encodeURIComponent(EVENT_NAME)}&key=${adminKey}`),
+      fetch(`/api/attendees?key=${adminKey}`),
+      fetch(`/api/checkin?key=${adminKey}`),
     ])
     if (!attendeesRes.ok) return false
-    const att = await attendeesRes.json()
+    const { event_name, attendees: att } = await attendeesRes.json()
     const chk: CheckinRecord[] = checkinsRes.ok ? await checkinsRes.json() : []
+    setEventName(event_name)
     setAttendees(att)
-    setCheckins(Object.fromEntries(chk.map(c => [c.user_id, c])))
+    setCheckins(Object.fromEntries(chk.map((c: CheckinRecord) => [c.user_id, c])))
     return true
   }, [])
 
@@ -67,9 +67,9 @@ export default function AdminPage() {
   useEffect(() => {
     if (!authed) return
     const id = setInterval(() => {
-      fetch(`/api/checkin?event=${encodeURIComponent(EVENT_NAME)}&key=${key}`)
+      fetch(`/api/checkin?key=${key}`)
         .then(r => r.ok ? r.json() : [])
-        .then((chk: CheckinRecord[]) => setCheckins(Object.fromEntries(chk.map(c => [c.user_id, c]))))
+        .then((chk: CheckinRecord[]) => setCheckins(Object.fromEntries(chk.map((c: CheckinRecord) => [c.user_id, c]))))
     }, 10_000)
     return () => clearInterval(id)
   }, [authed, key])
@@ -168,7 +168,7 @@ export default function AdminPage() {
       {/* Header */}
       <div className="bg-[#30364F] text-white p-6 rounded-b-3xl shadow-xl">
         <p className="text-[10px] font-black tracking-[0.2em] uppercase opacity-60 mb-1">Staff — Check-In</p>
-        <h1 className="text-xl font-black uppercase tracking-tight leading-tight">{EVENT_NAME}</h1>
+        <h1 className="text-xl font-black uppercase tracking-tight leading-tight">{eventName}</h1>
         <div className="flex gap-4 mt-3">
           <div className="text-center">
             <p className="text-2xl font-black">{checkedInCount}</p>
