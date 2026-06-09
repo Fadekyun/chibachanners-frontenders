@@ -69,13 +69,37 @@ Expected response:
 
 ## Frontend request flow
 
-1. The browser opens `/?token=<signed-token>`.
-2. The page requests `/api/attendee?token=<signed-token>` from the Next.js server.
-3. The Next.js route verifies the token with `OFFKAI_JWT_SECRET`.
-4. The Next.js server calls the internal offkai-bot API with `Authorization: Bearer <OFFKAI_API_KEY>`.
-5. The browser receives only the attendee and event records required to render the RSVP card.
+1. The bot sends the attendee a personal frontend URL in Discord DM.
+2. The browser opens `/?token=<signed-token>`.
+3. The page requests `/api/attendee?token=<signed-token>` from the Next.js server.
+4. The Next.js route verifies the token with `OFFKAI_JWT_SECRET`.
+5. The Next.js server calls the internal offkai-bot API with `Authorization: Bearer <OFFKAI_API_KEY>`.
+6. The browser receives only the attendee and event records required to render the RSVP card.
 
 The browser never calls the bot API directly and never receives the API key.
+
+## Personal frontend URL contract
+
+The bot remains responsible for adding the attendee-facing frontend URL to its Discord message or DM. The frontend does not create or send that link.
+
+The current frontend expects the bot-provided URL to include a signed token query parameter:
+
+```text
+https://<frontend-domain>/?token=<signed-token>
+```
+
+The token payload must include:
+
+```json
+{
+  "user_id": 123456789,
+  "event_name": "Bandori 10th Offkai"
+}
+```
+
+The bot and frontend must use the same `OFFKAI_JWT_SECRET`. An expiry claim is recommended so old personal RSVP links stop working after the event.
+
+If the bot already generates this complete signed URL, no additional link-generation work is required. If it currently adds only the bare frontend URL without `?token=...`, update the bot-side URL formatting before deployment.
 
 ## Required offkai-bot API contract
 
@@ -133,19 +157,6 @@ Required response fields:
 ```
 
 Use `"status": "waitlist"` for a waitlist entry.
-
-## Token payload contract
-
-The link token must be signed using the shared `OFFKAI_JWT_SECRET` and include:
-
-```json
-{
-  "user_id": 123456789,
-  "event_name": "Bandori 10th Offkai"
-}
-```
-
-An expiry claim is recommended so old personal RSVP links stop working after the event.
 
 ## Remaining packaging follow-up
 
