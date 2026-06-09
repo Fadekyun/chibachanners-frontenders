@@ -190,29 +190,26 @@ export default function AdminPage() {
       </div>
 
       <div className="p-4 space-y-4">
-        {/* Scanner */}
-        {(scanning || scanResult) && (
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            {scanning && (
-              <div id={scannerDivId} className="w-full" />
-            )}
-            {!scanning && scanResult && (
-              <div className={`p-6 text-center ${scanResult.ok ? 'bg-green-50' : 'bg-red-50'}`}>
-                <div className="text-4xl mb-2">{scanResult.ok ? (scanResult.already ? '🔄' : '✅') : '❌'}</div>
-                <p className={`font-black text-lg uppercase ${scanResult.ok ? 'text-green-700' : 'text-red-700'}`}>
-                  {scanResult.already ? 'Already Checked In' : scanResult.ok ? 'Checked In!' : 'Invalid'}
-                </p>
-                <p className="font-bold text-sm mt-1 text-gray-600">{scanResult.name}</p>
-                <button
-                  onClick={() => { setScanResult(null); startScanner() }}
-                  className="mt-4 bg-[#30364F] text-white font-black uppercase text-xs tracking-widest px-6 py-2 rounded-xl"
-                >
-                  Scan Next
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        {/* Scanner — div must always be in the DOM so html5-qrcode can find it before React re-renders */}
+        <div className={`bg-white rounded-2xl border border-gray-200 overflow-hidden ${!scanning && !scanResult ? 'hidden' : ''}`}>
+          {/* Scanner viewport — always mounted; hidden via CSS when not scanning */}
+          <div id={scannerDivId} className={`w-full ${scanning ? '' : 'hidden'}`} />
+          {!scanning && scanResult && (
+            <div className={`p-6 text-center ${scanResult.ok ? 'bg-green-50' : 'bg-red-50'}`}>
+              <div className="text-4xl mb-2">{scanResult.ok ? (scanResult.already ? '🔄' : '✅') : '❌'}</div>
+              <p className={`font-black text-lg uppercase ${scanResult.ok ? 'text-green-700' : 'text-red-700'}`}>
+                {scanResult.already ? 'Already Checked In' : scanResult.ok ? 'Checked In!' : 'Invalid'}
+              </p>
+              <p className="font-bold text-sm mt-1 text-gray-600">{scanResult.name}</p>
+              <button
+                onClick={() => { setScanResult(null); startScanner() }}
+                className="mt-4 bg-[#30364F] text-white font-black uppercase text-xs tracking-widest px-6 py-2 rounded-xl"
+              >
+                Scan Next
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Filters + Search */}
         <div className="flex gap-2">
